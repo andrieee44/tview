@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/gabriel-vasile/mimetype"
 )
 
 func exit(err error) {
@@ -62,7 +66,8 @@ func readConfig(name string) map[string][]string {
 	exitIf(err)
 
 	cfg = map[string][]string{
-		"text/plain": {"cat"},
+		"text/plain":               {"cat"},
+		"application/octet-stream": {"file", "cat"},
 	}
 
 	json.NewDecoder(file).Decode(&cfg)
@@ -87,8 +92,19 @@ func getFile(args []string) *os.File {
 	return file
 }
 
-func detectMime(file *os.File) string {
-	return "text/plain"
+func detectMime(file *os.File) (io.Reader, string) {
+	var (
+		header *bytes.Buffer
+		mime   *mimetype.MIME
+		err    error
+	)
+
+	header = bytes.NewBuffer(nil)
+
+	mime, err = mimetype.DetectReader(io.TeeReader(file, header))
+	exitIf(err)
+
+	return io.MultiReader(header, file), mime.String()
 }
 
 func programPath(prog string) (string, bool) {
@@ -109,11 +125,11 @@ func programPath(prog string) (string, bool) {
 	panic(fmt.Errorf("tview: %s", err))
 }
 
-func execProgram(prog string, file *os.File) {
+func execProgram(prog string, stdin io.Reader) {
 	var cmd *exec.Cmd
 
 	cmd = exec.Command("/bin/sh", "-c", "--", prog)
-	cmd.Stdin = file
+	cmd.Stdin = stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	panicIf(cmd.Err)
@@ -123,24 +139,28 @@ func execProgram(prog string, file *os.File) {
 func viewFile(file *os.File, cfg map[string][]string) {
 	var (
 		mime, bin, path string
+		stdin           io.Reader
 		bins            []string
 		ok              bool
 	)
 
-	mime = detectMime(file)
+	stdin, mime = detectMime(file)
+
 	bins, ok = cfg[mime]
 	if !ok {
-		exit(fmt.Errorf("%s: empty program list", mime))
+		bins = cfg["application/octet-stream"]
 	}
 
 	for _, bin = range bins {
 		path, ok = programPath(bin)
 		if ok {
-			execProgram(path, file)
+			execProgram(path, stdin)
 			panicIf(file.Close())
 
 			return
 		}
+
+		fmt.Fprintf(os.Stderr, "tview: %s: cannot locate program\n", bin)
 	}
 
 	exit(fmt.Errorf("%s: no valid programs", mime))
