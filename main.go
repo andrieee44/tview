@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/gabriel-vasile/mimetype"
 )
@@ -104,7 +105,7 @@ func detectMime(file *os.File) (io.Reader, string) {
 	mime, err = mimetype.DetectReader(io.TeeReader(file, header))
 	exitIf(err)
 
-	return io.MultiReader(header, file), mime.String()
+	return io.MultiReader(header, file), strings.Split(mime.String(), ";")[0]
 }
 
 func programPath(prog string) (string, bool) {
