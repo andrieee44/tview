@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"al.essio.dev/pkg/shellescape"
 	"github.com/gabriel-vasile/mimetype"
 )
 
@@ -56,17 +57,94 @@ func configDir() string {
 
 func readConfig(name string) map[string][]string {
 	var (
-		file *os.File
-		cfg  map[string][]string
-		err  error
+		file                                                     *os.File
+		audioVideo, image, archive, office, text, jq, html, diff []string
+		cfg                                                      map[string][]string
+		err                                                      error
 	)
 
 	file, err = os.OpenFile(name, os.O_RDONLY|os.O_CREATE, 0644)
 	exitIf(err)
 
+	audioVideo = []string{"mediainfo --"}
+	image = []string{"chafa --", "mediainfo --"}
+	archive = []string{"atool -l --"}
+	office = []string{"libreoffice --cat"}
+	text = []string{"bat --color always --paging never --", "highlight --force --", "source-highlight --failsafe -i", "cat --"}
+	jq = []string{"jaq --color always .", "jq -C ."}
+	html = []string{"elinks -dump 1 -no-references -no-numbering", "lynx -dump -nonumbers -nolist --", "w3m -dump"}
+	diff = []string{"delta <", "diff-so-fancy <", "colordiff <"}
+
 	cfg = map[string][]string{
-		"text/plain":               {"file --", "cat --"},
-		"application/octet-stream": {"file --", "cat --"},
+		"audio/aac":                audioVideo,
+		"application/x-abiword":    office,
+		"image/apng":               image,
+		"application/x-freearc":    archive,
+		"image/avif":               image,
+		"video/x-msvideo":          audioVideo,
+		"application/octet-stream": {"exiftool --", "file --", "cat --"},
+		"image/bmp":                image,
+		"application/x-bzip":       archive,
+		"application/x-bzip2":      archive,
+		"application/x-cdf":        audioVideo,
+		"application/x-csh":        text,
+		"text/css":                 text,
+		"text/csv":                 text,
+		"application/msword":       office,
+		"application/vnd.openxmlformats-officedocument.wordprocessingml.document": office,
+		"application/gzip":         archive,
+		"application/x-gzip":       archive,
+		"image/gif":                image,
+		"text/html":                html,
+		"image/vnd.microsoft.icon": image,
+		"application/java-archive": archive,
+		"image/jpeg":               image,
+		"text/javascript":          text,
+		"application/json":         jq,
+		"application/ld+json":      jq,
+		"audio/midi":               audioVideo,
+		"audio/x-midi":             audioVideo,
+		"audio/mpeg":               audioVideo,
+		"video/mp4":                audioVideo,
+		"video/mpeg":               audioVideo,
+		"application/vnd.oasis.opendocument.presentation": office,
+		"application/vnd.oasis.opendocument.spreadsheet":  office,
+		"application/vnd.oasis.opendocument.text":         office,
+		"audio/ogg":                     audioVideo,
+		"video/ogg":                     audioVideo,
+		"application/ogg":               audioVideo,
+		"image/png":                     image,
+		"application/pdf":               office,
+		"application/x-httpd-php":       text,
+		"application/vnd.ms-powerpoint": office,
+		"application/vnd.openxmlformats-officedocument.presentationml.presentation": office,
+		"application/vnd.rar":      archive,
+		"application/rtf":          text,
+		"application/x-sh":         text,
+		"image/svg+xml":            image,
+		"application/x-tar":        archive,
+		"image/tiff":               image,
+		"video/mp2t":               audioVideo,
+		"text/plain":               text,
+		"audio/wav":                audioVideo,
+		"audio/webm":               audioVideo,
+		"video/webm":               audioVideo,
+		"image/webp":               image,
+		"application/xhtml+xml":    html,
+		"application/vnd.ms-excel": office,
+		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": office,
+		"application/xml":             text,
+		"application/zip":             archive,
+		"video/3gpp":                  audioVideo,
+		"audio/3gpp":                  audioVideo,
+		"video/3gpp2":                 audioVideo,
+		"audio/3gpp2":                 audioVideo,
+		"application/x-7z-compressed": archive,
+		"text/markdown":               {"glow --", "mdcat --"},
+		"inode/directory":             {"ls --color --group-directories-first --"},
+		"text/x-diff":                 diff,
+		"text/x-patch":                diff,
+		"application/x-bittorrent":    {"transmission-show --"},
 	}
 
 	json.NewDecoder(file).Decode(&cfg)
@@ -75,16 +153,21 @@ func readConfig(name string) map[string][]string {
 	return cfg
 }
 
-func detectMime(path string) string {
+func detectMime(path string) (string, string) {
 	var (
-		mime *mimetype.MIME
-		err  error
+		mime, parentMime *mimetype.MIME
+		err              error
 	)
 
 	mime, err = mimetype.DetectFile(path)
 	exitIf(err)
 
-	return strings.Split(mime.String(), ";")[0]
+	parentMime = mime.Parent()
+	if parentMime == nil {
+		return strings.Split(mime.String(), ";")[0], "application/octet-stream"
+	}
+
+	return strings.Split(mime.String(), ";")[0], strings.Split(parentMime.String(), ";")[0]
 }
 
 func binaryPath(bin, path string) (string, bool) {
@@ -102,7 +185,7 @@ func binaryPath(bin, path string) (string, bool) {
 	binPath, err = exec.LookPath(argv[0])
 	if err == nil {
 		argv[0] = binPath
-		argv = append(argv, path)
+		argv = append(argv, shellescape.Quote(path))
 
 		return strings.Join(argv, " "), true
 	}
@@ -114,39 +197,33 @@ func binaryPath(bin, path string) (string, bool) {
 	panic(fmt.Errorf("tview: %s", err))
 }
 
-func execProgram(binPath string) {
+func execProgram(binPath string) bool {
 	var cmd *exec.Cmd
 
 	cmd = exec.Command("/bin/sh", "-c", "--", binPath)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	panicIf(cmd.Err)
-	exitIf(cmd.Run())
+
+	return cmd.Run() == nil
 }
 
 func viewFile(path string, cfg map[string][]string) {
 	var (
-		mime, bin, binPath string
-		bins               []string
-		ok                 bool
+		mime, parentMime, bin, binPath string
+		ok                             bool
 	)
 
-	mime = detectMime(path)
-
-	bins, ok = cfg[mime]
-	if !ok {
-		bins = cfg["application/octet-stream"]
-	}
-
-	for _, bin = range bins {
+	mime, parentMime = detectMime(path)
+	for _, bin = range append(append(cfg[mime], cfg[parentMime]...), cfg["application/octet-stream"]...) {
 		binPath, ok = binaryPath(bin, path)
 		if !ok {
 			continue
 		}
 
-		execProgram(binPath)
-
-		return
+		if execProgram(binPath) {
+			return
+		}
 	}
 
 	exit(fmt.Errorf("%s: no valid programs", mime))
