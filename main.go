@@ -1,12 +1,10 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -67,8 +65,8 @@ func readConfig(name string) map[string][]string {
 	exitIf(err)
 
 	cfg = map[string][]string{
-		"text/plain":               {"cat"},
-		"application/octet-stream": {"file", "cat"},
+		"text/plain":               {"file --", "cat --"},
+		"application/octet-stream": {"file --", "cat --"},
 	}
 
 	json.NewDecoder(file).Decode(&cfg)
@@ -77,46 +75,36 @@ func readConfig(name string) map[string][]string {
 	return cfg
 }
 
-func getFile(args []string) *os.File {
+func detectMime(path string) string {
 	var (
-		file *os.File
+		mime *mimetype.MIME
 		err  error
 	)
 
-	if len(args) == 0 {
-		return os.Stdin
+	mime, err = mimetype.DetectFile(path)
+	exitIf(err)
+
+	return strings.Split(mime.String(), ";")[0]
+}
+
+func binaryPath(bin, path string) (string, bool) {
+	var (
+		argv    []string
+		binPath string
+		err     error
+	)
+
+	argv = strings.Fields(bin)
+	if len(argv) == 0 {
+		exit(errors.New("unexpected empty binary path"))
 	}
 
-	file, err = os.Open(args[0])
-	exitIf(err)
-
-	return file
-}
-
-func detectMime(file *os.File) (io.Reader, string) {
-	var (
-		header *bytes.Buffer
-		mime   *mimetype.MIME
-		err    error
-	)
-
-	header = bytes.NewBuffer(nil)
-
-	mime, err = mimetype.DetectReader(io.TeeReader(file, header))
-	exitIf(err)
-
-	return io.MultiReader(header, file), strings.Split(mime.String(), ";")[0]
-}
-
-func programPath(prog string) (string, bool) {
-	var (
-		path string
-		err  error
-	)
-
-	path, err = exec.LookPath(prog)
+	binPath, err = exec.LookPath(argv[0])
 	if err == nil {
-		return path, true
+		argv[0] = binPath
+		argv = append(argv, path)
+
+		return strings.Join(argv, " "), true
 	}
 
 	if errors.Is(err, exec.ErrNotFound) {
@@ -126,26 +114,24 @@ func programPath(prog string) (string, bool) {
 	panic(fmt.Errorf("tview: %s", err))
 }
 
-func execProgram(prog string, stdin io.Reader) {
+func execProgram(binPath string) {
 	var cmd *exec.Cmd
 
-	cmd = exec.Command("/bin/sh", "-c", "--", prog)
-	cmd.Stdin = stdin
+	cmd = exec.Command("/bin/sh", "-c", "--", binPath)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	panicIf(cmd.Err)
 	exitIf(cmd.Run())
 }
 
-func viewFile(file *os.File, cfg map[string][]string) {
+func viewFile(path string, cfg map[string][]string) {
 	var (
-		mime, bin, path string
-		stdin           io.Reader
-		bins            []string
-		ok              bool
+		mime, bin, binPath string
+		bins               []string
+		ok                 bool
 	)
 
-	stdin, mime = detectMime(file)
+	mime = detectMime(path)
 
 	bins, ok = cfg[mime]
 	if !ok {
@@ -153,33 +139,32 @@ func viewFile(file *os.File, cfg map[string][]string) {
 	}
 
 	for _, bin = range bins {
-		path, ok = programPath(bin)
-		if ok {
-			execProgram(path, stdin)
-			panicIf(file.Close())
-
-			return
+		binPath, ok = binaryPath(bin, path)
+		if !ok {
+			continue
 		}
 
-		fmt.Fprintf(os.Stderr, "tview: %s: cannot locate program\n", bin)
+		execProgram(binPath)
+
+		return
 	}
 
 	exit(fmt.Errorf("%s: no valid programs", mime))
 }
 
 func main() {
-	var cfgFlag string
+	var (
+		cfgFlag string
+		argv    []string
+	)
 
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), `usage: tview FILE
 
 tview displays the FILE based on mimetype.
 mimetype programs list is in config file.
-if no FILE, read from STDIN.
 
-example: tview file.html
-
-program receives the FILE through STDIN.`)
+example: tview file.html`)
 
 		flag.PrintDefaults()
 	}
@@ -187,5 +172,11 @@ program receives the FILE through STDIN.`)
 	flag.StringVar(&cfgFlag, "c", filepath.Join(configDir(), "config.json"), "config file path")
 	flag.Parse()
 
-	viewFile(getFile(flag.Args()), readConfig(cfgFlag))
+	argv = flag.Args()
+	if len(argv) != 1 {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	viewFile(argv[0], readConfig(cfgFlag))
 }
