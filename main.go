@@ -12,6 +12,7 @@ import (
 
 	"al.essio.dev/pkg/shellescape"
 	"github.com/gabriel-vasile/mimetype"
+	"golang.org/x/term"
 )
 
 func exit(err error) {
@@ -66,31 +67,54 @@ func readConfig(name string) map[string][]string {
 	file, err = os.OpenFile(name, os.O_RDONLY|os.O_CREATE, 0644)
 	exitIf(err)
 
-	audioVideo = []string{"mediainfo --"}
-	image = []string{"chafa --", "mediainfo --"}
-	archive = []string{"atool -l --"}
-	office = []string{"libreoffice --cat"}
-	text = []string{"bat --color always --paging never --", "highlight --force --", "source-highlight --failsafe -i", "cat --"}
-	jq = []string{"jaq --color always .", "jq -C ."}
-	html = []string{"elinks -dump 1 -no-references -no-numbering", "lynx -dump -nonumbers -nolist --", "w3m -dump"}
-	diff = []string{"delta <", "diff-so-fancy <", "colordiff <"}
+	audioVideo = []string{`mediainfo -- "$TVIEW_FILE"`}
+	archive = []string{`atool -l -- "$TVIEW_FILE"`}
+	office = []string{`libreoffice --cat "$TVIEW_FILE"`}
+
+	image = []string{
+		`chafa -s "${TVIEW_WIDTH}x${TVIEW_HEIGHT}" -- "$TVIEW_FILE"`,
+		`mediainfo -- "$TVIEW_FILE"`,
+	}
+
+	jq = []string{
+		`jaq --color always . "$TVIEW_FILE"`,
+		`jq -C . "$TVIEW_FILE"`,
+	}
+
+	text = []string{
+		`bat --color always --paging never --termiinal-width "$TVIEW_WIDTH" -- "$TVIEW_FILE"`,
+		`highlight --force -- "$TVIEW_FILE"`,
+		`source-highlight --failsafe -i "$TVIEW_FILE"`,
+		`cat -- "$TVIEW_FILE"`,
+	}
+
+	html = []string{
+		`elinks -dump 1 -no-references -no-numbering -dump-width "$TVIEW_WIDTH" "$TVIEW_FILE"`,
+		`lynx -dump -nonumbers -nolist -width "$TVIEW_WIDTH" -- "$TVIEW_FILE"`,
+		`w3m -dump "$TVIEW_FILE"`,
+	}
+
+	diff = []string{
+		`delta <`,
+		`diff-so-fancy <`,
+		`colordiff <`,
+	}
 
 	cfg = map[string][]string{
-		"audio/aac":                audioVideo,
-		"application/x-abiword":    office,
-		"image/apng":               image,
-		"application/x-freearc":    archive,
-		"image/avif":               image,
-		"video/x-msvideo":          audioVideo,
-		"application/octet-stream": {"exiftool --", "file --", "cat --"},
-		"image/bmp":                image,
-		"application/x-bzip":       archive,
-		"application/x-bzip2":      archive,
-		"application/x-cdf":        audioVideo,
-		"application/x-csh":        text,
-		"text/css":                 text,
-		"text/csv":                 text,
-		"application/msword":       office,
+		"audio/aac":             audioVideo,
+		"application/x-abiword": office,
+		"image/apng":            image,
+		"application/x-freearc": archive,
+		"image/avif":            image,
+		"video/x-msvideo":       audioVideo,
+		"image/bmp":             image,
+		"application/x-bzip":    archive,
+		"application/x-bzip2":   archive,
+		"application/x-cdf":     audioVideo,
+		"application/x-csh":     text,
+		"text/css":              text,
+		"text/csv":              text,
+		"application/msword":    office,
 		"application/vnd.openxmlformats-officedocument.wordprocessingml.document": office,
 		"application/gzip":         archive,
 		"application/x-gzip":       archive,
@@ -140,11 +164,21 @@ func readConfig(name string) map[string][]string {
 		"video/3gpp2":                 audioVideo,
 		"audio/3gpp2":                 audioVideo,
 		"application/x-7z-compressed": archive,
-		"text/markdown":               {"glow --", "mdcat --"},
-		"inode/directory":             {"ls --color --group-directories-first --"},
 		"text/x-diff":                 diff,
 		"text/x-patch":                diff,
-		"application/x-bittorrent":    {"transmission-show --"},
+		"application/x-bittorrent":    {`transmission-show -- "$TVIEW_FILE"`},
+		"inode/directory":             {`ls --color --group-directories-first -w "$TVIEW_WIDTH" -- "$TVIEW_FILE"`},
+
+		"application/octet-stream": {
+			`exiftool -- "$TVIEW_FILE"`,
+			`file -- "$TVIEW_FILE"`,
+			`cat -- "$TVIEW_FILE"`,
+		},
+
+		"text/markdown": {
+			`glow -w "$TVIEW_WIDTH" -- "$TVIEW_FILE"`,
+			`mdcat --columns "$TVIEW_WIDTH" -- "$TVIEW_FILE"`,
+		},
 	}
 
 	json.NewDecoder(file).Decode(&cfg)
@@ -170,7 +204,7 @@ func detectMime(path string) (string, string) {
 	return strings.Split(mime.String(), ";")[0], strings.Split(parentMime.String(), ";")[0]
 }
 
-func binaryPath(bin, path string) (string, bool) {
+func binaryPath(bin string) (string, bool) {
 	var (
 		argv    []string
 		binPath string
@@ -185,7 +219,6 @@ func binaryPath(bin, path string) (string, bool) {
 	binPath, err = exec.LookPath(argv[0])
 	if err == nil {
 		argv[0] = binPath
-		argv = append(argv, shellescape.Quote(path))
 
 		return strings.Join(argv, " "), true
 	}
@@ -197,18 +230,27 @@ func binaryPath(bin, path string) (string, bool) {
 	panic(fmt.Errorf("tview: %s", err))
 }
 
-func execProgram(binPath string) bool {
+func execProgram(binPath, path string, width, height, x, y int) bool {
 	var cmd *exec.Cmd
 
 	cmd = exec.Command("/bin/sh", "-c", "--", binPath)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
+	cmd.Env = append(cmd.Environ(), []string{
+		fmt.Sprintf("TVIEW_FILE=%s", shellescape.Quote(path)),
+		fmt.Sprintf("TVIEW_WIDTH=%d", width),
+		fmt.Sprintf("TVIEW_HEIGHT=%d", height),
+		fmt.Sprintf("TVIEW_X=%d", x),
+		fmt.Sprintf("TVIEW_Y=%d", y),
+	}...)
+
 	panicIf(cmd.Err)
 
 	return cmd.Run() == nil
 }
 
-func viewFile(path string, cfg map[string][]string) {
+func viewFile(path string, cfg map[string][]string, width, height, x, y int) {
 	var (
 		mime, parentMime, bin, binPath string
 		ok                             bool
@@ -216,12 +258,12 @@ func viewFile(path string, cfg map[string][]string) {
 
 	mime, parentMime = detectMime(path)
 	for _, bin = range append(append(cfg[mime], cfg[parentMime]...), cfg["application/octet-stream"]...) {
-		binPath, ok = binaryPath(bin, path)
+		binPath, ok = binaryPath(bin)
 		if !ok {
 			continue
 		}
 
-		if execProgram(binPath) {
+		if execProgram(binPath, path, width, height, x, y) {
 			return
 		}
 	}
@@ -231,8 +273,11 @@ func viewFile(path string, cfg map[string][]string) {
 
 func main() {
 	var (
-		cfgFlag string
-		argv    []string
+		cfgFlag                             string
+		widthFlag, heightFlag, xFlag, yFlag int
+		width, height                       int
+		argv                                []string
+		err                                 error
 	)
 
 	flag.Usage = func() {
@@ -246,7 +291,14 @@ example: tview file.html`)
 		flag.PrintDefaults()
 	}
 
+	width, height, err = term.GetSize(int(os.Stdin.Fd()))
+	exitIf(err)
+
 	flag.StringVar(&cfgFlag, "c", filepath.Join(configDir(), "config.json"), "config file path")
+	flag.IntVar(&widthFlag, "w", width, "terminal width")
+	flag.IntVar(&heightFlag, "h", height, "terminal height")
+	flag.IntVar(&xFlag, "x", 0, "x coordinates of pane")
+	flag.IntVar(&yFlag, "y", 0, "y coordinates of pane")
 	flag.Parse()
 
 	argv = flag.Args()
@@ -255,5 +307,5 @@ example: tview file.html`)
 		os.Exit(1)
 	}
 
-	viewFile(argv[0], readConfig(cfgFlag))
+	viewFile(argv[0], readConfig(cfgFlag), widthFlag, heightFlag, xFlag, yFlag)
 }
