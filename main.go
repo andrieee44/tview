@@ -277,7 +277,6 @@ func main() {
 		widthFlag, heightFlag, xFlag, yFlag int
 		width, height                       int
 		argv                                []string
-		err                                 error
 	)
 
 	flag.Usage = func() {
@@ -291,9 +290,7 @@ example: tview file.html`)
 		flag.PrintDefaults()
 	}
 
-	width, height, err = term.GetSize(int(os.Stdin.Fd()))
-	exitIf(err)
-
+	width, height, _ = term.GetSize(int(os.Stdin.Fd()))
 	flag.StringVar(&cfgFlag, "c", filepath.Join(configDir(), "config.json"), "config file path")
 	flag.IntVar(&widthFlag, "w", width, "terminal width")
 	flag.IntVar(&heightFlag, "h", height, "terminal height")
