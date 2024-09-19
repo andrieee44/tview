@@ -82,7 +82,7 @@ func readConfig(name string) map[string][]string {
 	}
 
 	text = []string{
-		`bat --color always --paging never --termiinal-width "$TVIEW_WIDTH" -- "$TVIEW_FILE"`,
+		`bat --color always --paging never --terminal-width "$TVIEW_WIDTH" -- "$TVIEW_FILE"`,
 		`highlight --force -- "$TVIEW_FILE"`,
 		`source-highlight --failsafe -i "$TVIEW_FILE"`,
 		`cat -- "$TVIEW_FILE"`,
