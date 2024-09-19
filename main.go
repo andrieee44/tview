@@ -95,9 +95,9 @@ func readConfig(name string) map[string][]string {
 	}
 
 	diff = []string{
-		`delta <`,
-		`diff-so-fancy <`,
-		`colordiff <`,
+		`delta < "$TVIEW_FILE"`,
+		`diff-so-fancy < "$TVIEW_FILE"`,
+		`colordiff < "$TVIEW_FILE"`,
 	}
 
 	cfg = map[string][]string{
