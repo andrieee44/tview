@@ -72,7 +72,7 @@ func readConfig(name string) map[string][]string {
 	office = []string{`libreoffice --cat "$TVIEW_FILE"`}
 
 	image = []string{
-		`chafa -s "${TVIEW_WIDTH}x${TVIEW_HEIGHT}" -- "$TVIEW_FILE"`,
+		`chafa -f sixel -s "${TVIEW_WIDTH}x${TVIEW_HEIGHT}" -- "$TVIEW_FILE"`,
 		`mediainfo -- "$TVIEW_FILE"`,
 	}
 
