@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"al.essio.dev/pkg/shellescape"
 	"github.com/gabriel-vasile/mimetype"
 	"golang.org/x/term"
 )
@@ -237,7 +236,7 @@ func execProgram(binPath, path string, width, height, x, y int) bool {
 	cmd.Stderr = os.Stderr
 
 	cmd.Env = append(cmd.Environ(), []string{
-		fmt.Sprintf("TVIEW_FILE=%s", shellescape.Quote(path)),
+		fmt.Sprintf("TVIEW_FILE=%s", path),
 		fmt.Sprintf("TVIEW_WIDTH=%d", width),
 		fmt.Sprintf("TVIEW_HEIGHT=%d", height),
 		fmt.Sprintf("TVIEW_X=%d", x),
