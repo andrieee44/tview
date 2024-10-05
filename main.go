@@ -202,36 +202,10 @@ func detectMime(path string) (string, string) {
 	return strings.Split(mime.String(), ";")[0], strings.Split(parentMime.String(), ";")[0]
 }
 
-func binaryPath(bin string) (string, bool) {
-	var (
-		argv    []string
-		binPath string
-		err     error
-	)
-
-	argv = strings.Fields(bin)
-	if len(argv) == 0 {
-		exit(errors.New("unexpected empty binary path"))
-	}
-
-	binPath, err = exec.LookPath(argv[0])
-	if err == nil {
-		argv[0] = binPath
-
-		return strings.Join(argv, " "), true
-	}
-
-	if errors.Is(err, exec.ErrNotFound) {
-		return "", false
-	}
-
-	panic(fmt.Errorf("tview: %s", err))
-}
-
-func execProgram(binPath, path string, width, height, x, y int) bool {
+func execProgram(bin, path string, width, height, x, y int) bool {
 	var cmd *exec.Cmd
 
-	cmd = exec.Command("/bin/sh", "-c", "--", binPath)
+	cmd = exec.Command("/bin/sh", "-c", "--", bin)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -249,19 +223,11 @@ func execProgram(binPath, path string, width, height, x, y int) bool {
 }
 
 func viewFile(path string, cfg map[string][]string, width, height, x, y int) {
-	var (
-		mime, parentMime, bin, binPath string
-		ok                             bool
-	)
+	var mime, parentMime, bin string
 
 	mime, parentMime = detectMime(path)
 	for _, bin = range append(append(cfg[mime], cfg[parentMime]...), cfg["application/octet-stream"]...) {
-		binPath, ok = binaryPath(bin)
-		if !ok {
-			continue
-		}
-
-		if execProgram(binPath, path, width, height, x, y) {
+		if execProgram(bin, path, width, height, x, y) {
 			return
 		}
 	}
