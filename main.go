@@ -57,21 +57,31 @@ func configDir() string {
 
 func readConfig(name string) map[string][]string {
 	var (
-		file                                                     *os.File
-		audioVideo, image, archive, office, text, jq, html, diff []string
-		cfg                                                      map[string][]string
-		err                                                      error
+		file                                                       *os.File
+		audio, archive, office, video, image, jq, text, html, diff []string
+		cfg                                                        map[string][]string
+		err                                                        error
 	)
 
 	file, err = os.OpenFile(name, os.O_RDONLY|os.O_CREATE, 0644)
 	exitIf(err)
 
-	audioVideo = []string{`mediainfo -- "$TVIEW_FILE"`}
+	audio = []string{`mediainfo -- "$TVIEW_FILE"`}
 	archive = []string{`atool -l -- "$TVIEW_FILE"`}
-	office = []string{`libreoffice --cat "$TVIEW_FILE"`}
+
+	office = []string{
+		`unoconv --stdout -e PageRange=1 -f jpg -- "$TVIEW_FILE" | chafa -s "${TVIEW_WIDTH}x${TVIEW_HEIGHT}" $([ "${XDG_SESSION_TYPE:-}" = "tty" ] || printf -- "-f sixels")`,
+		`libreoffice --cat "$TVIEW_FILE"`,
+	}
+
+	video = []string{
+		`ffmpegthumbnailer -i "$TVIEW_FILE" -s 0 -o /dev/stdout | chafa -s "${TVIEW_WIDTH}x${TVIEW_HEIGHT}" $([ "${XDG_SESSION_TYPE:-}" = "tty" ] || printf -- "-f sixels")`,
+		`mediainfo -- "$TVIEW_FILE"`,
+	}
 
 	image = []string{
-		`chafa -f sixel -s "${TVIEW_WIDTH}x${TVIEW_HEIGHT}" -- "$TVIEW_FILE"`,
+		`chafa -s "${TVIEW_WIDTH}x${TVIEW_HEIGHT}" $([ "${XDG_SESSION_TYPE:-}" = "tty" ] || printf -- "-f sixels") "$TVIEW_FILE"`,
+		`magick "$TVIEW_FILE" jpg:- | chafa -s "${TVIEW_WIDTH}x${TVIEW_HEIGHT}" $([ "${XDG_SESSION_TYPE:-}" = "tty" ] || printf -- "-f sixels")`,
 		`mediainfo -- "$TVIEW_FILE"`,
 	}
 
@@ -99,16 +109,15 @@ func readConfig(name string) map[string][]string {
 	}
 
 	cfg = map[string][]string{
-		"audio/aac":             audioVideo,
-		"application/x-abiword": office,
+		"audio/aac":             audio,
 		"image/apng":            image,
 		"application/x-freearc": archive,
 		"image/avif":            image,
-		"video/x-msvideo":       audioVideo,
+		"video/x-msvideo":       video,
 		"image/bmp":             image,
 		"application/x-bzip":    archive,
 		"application/x-bzip2":   archive,
-		"application/x-cdf":     audioVideo,
+		"application/x-cdf":     audio,
 		"application/x-csh":     text,
 		"text/css":              text,
 		"text/csv":              text,
@@ -124,19 +133,18 @@ func readConfig(name string) map[string][]string {
 		"text/javascript":          text,
 		"application/json":         jq,
 		"application/ld+json":      jq,
-		"audio/midi":               audioVideo,
-		"audio/x-midi":             audioVideo,
-		"audio/mpeg":               audioVideo,
-		"video/mp4":                audioVideo,
-		"video/mpeg":               audioVideo,
+		"audio/midi":               audio,
+		"audio/x-midi":             audio,
+		"audio/mpeg":               audio,
+		"video/mp4":                video,
+		"video/mpeg":               video,
 		"application/vnd.oasis.opendocument.presentation": office,
 		"application/vnd.oasis.opendocument.spreadsheet":  office,
 		"application/vnd.oasis.opendocument.text":         office,
-		"audio/ogg":                     audioVideo,
-		"video/ogg":                     audioVideo,
-		"application/ogg":               audioVideo,
+		"audio/ogg":                     audio,
+		"video/ogg":                     video,
+		"application/ogg":               audio,
 		"image/png":                     image,
-		"application/pdf":               office,
 		"application/x-httpd-php":       text,
 		"application/vnd.ms-powerpoint": office,
 		"application/vnd.openxmlformats-officedocument.presentationml.presentation": office,
@@ -146,24 +154,25 @@ func readConfig(name string) map[string][]string {
 		"image/svg+xml":            image,
 		"application/x-tar":        archive,
 		"image/tiff":               image,
-		"video/mp2t":               audioVideo,
+		"video/mp2t":               video,
 		"text/plain":               text,
-		"audio/wav":                audioVideo,
-		"audio/webm":               audioVideo,
-		"video/webm":               audioVideo,
+		"audio/wav":                audio,
+		"audio/webm":               audio,
+		"video/webm":               video,
 		"image/webp":               image,
 		"application/xhtml+xml":    html,
 		"application/vnd.ms-excel": office,
 		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": office,
 		"application/xml":             text,
 		"application/zip":             archive,
-		"video/3gpp":                  audioVideo,
-		"audio/3gpp":                  audioVideo,
-		"video/3gpp2":                 audioVideo,
-		"audio/3gpp2":                 audioVideo,
+		"video/3gpp":                  video,
+		"audio/3gpp":                  audio,
+		"video/3gpp2":                 video,
+		"audio/3gpp2":                 audio,
 		"application/x-7z-compressed": archive,
 		"text/x-diff":                 diff,
 		"text/x-patch":                diff,
+		"application/pdf":             {`pdftoppm -jpeg -f 1 -singlefile -- "$TVIEW_FILE" | chafa -s "${TVIEW_WIDTH}x${TVIEW_HEIGHT}" $([ "${XDG_SESSION_TYPE:-}" = "tty" ] || printf -- "-f sixels")`},
 		"application/x-bittorrent":    {`transmission-show -- "$TVIEW_FILE"`},
 		"inode/directory":             {`ls --color --group-directories-first -w "$TVIEW_WIDTH" -- "$TVIEW_FILE"`},
 
