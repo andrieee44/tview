@@ -253,7 +253,7 @@ func main() {
 	)
 
 	flag.Usage = func() {
-		fmt.Fprintln(flag.CommandLine.Output(), `usage: tview FILE
+		fmt.Fprintln(flag.CommandLine.Output(), `usage: tview [OPTION]... FILE
 
 tview displays the FILE based on mimetype.
 mimetype programs list is in config file.
