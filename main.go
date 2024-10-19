@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -44,15 +43,10 @@ func configDir() string {
 		return dir
 	}
 
-	dir = os.Getenv("HOME")
-	if dir != "" {
-		dir = filepath.Join(dir, ".config", dirName)
-		panicIf(os.MkdirAll(dir, 0755))
+	dir = filepath.Join(os.Getenv("HOME"), ".config", dirName)
+	panicIf(os.MkdirAll(dir, 0755))
 
-		return dir
-	}
-
-	panic(errors.New("tview: $HOME is empty"))
+	return dir
 }
 
 func readConfig(name string) map[string][]string {
