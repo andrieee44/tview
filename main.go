@@ -50,8 +50,10 @@ func configDir() string {
 
 		return dir
 	}
-	
-	panicIf(os.MkdirAll(filepath.Join(dir, "." + dirName), 0755))
+
+	panicIf(os.MkdirAll(filepath.Join(dir, "."+dirName), 0755))
+
+	return dir
 }
 
 func readConfig(name string) map[string][]string {
