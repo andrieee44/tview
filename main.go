@@ -264,7 +264,11 @@ func detectMime(data []byte) (string, string) {
 }
 
 func execProgram(bin string, flags *flagsStruct, path string, cache *os.File) bool {
-	var cmd *exec.Cmd
+	var (
+		cmd     *exec.Cmd
+		success bool
+		err     error
+	)
 
 	cmd = exec.Command("/bin/sh", "-c", "--", bin)
 	cmd.Stdout = cache
@@ -279,8 +283,12 @@ func execProgram(bin string, flags *flagsStruct, path string, cache *os.File) bo
 	}...)
 
 	panicIf(cmd.Err)
+	success = cmd.Run() == nil
 
-	return cmd.Run() == nil
+	_, err = cache.Seek(io.SeekStart, 0)
+	panicIf(err)
+
+	return success
 }
 
 func viewFile(flags *flagsStruct, path string) {
@@ -304,14 +312,12 @@ func viewFile(flags *flagsStruct, path string) {
 	cache, err = os.OpenFile(cachePath, os.O_RDWR|os.O_CREATE, 0600)
 	panicIf(err)
 
-	defer func() {
-		exitIf(cache.Close())
-	}()
-
 	for _, bin = range append(append(cfg[mime], cfg[parentMime]...), cfg["application/octet-stream"]...) {
 		if cacheHit || execProgram(bin, flags, path, cache) {
 			_, err = io.Copy(os.Stdout, cache)
 			panicIf(err)
+
+			exitIf(cache.Close())
 
 			return
 		}
