@@ -1,9 +1,12 @@
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,6 +15,11 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 	"golang.org/x/term"
 )
+
+type flagsStruct struct {
+	cfg, cache          string
+	width, height, x, y int
+}
 
 func exit(err error) {
 	fmt.Fprintln(os.Stderr, "tview:", err)
@@ -51,9 +59,52 @@ func configDir() string {
 		return dir
 	}
 
-	panicIf(os.MkdirAll(filepath.Join(dir, "."+dirName), 0755))
+	panicIf(os.MkdirAll(filepath.Join(dir, "."+dirName, "config"), 0755))
 
 	return dir
+}
+
+func cacheDir() string {
+	const dirName string = "tview"
+
+	var dir string
+
+	dir = os.Getenv("XDG_CACHE_HOME")
+	if dir != "" {
+		dir = filepath.Join(dir, dirName)
+		panicIf(os.MkdirAll(dir, 0755))
+
+		return dir
+	}
+
+	dir = os.Getenv("HOME")
+	if dir != "" {
+		dir = filepath.Join(dir, ".cache", dirName)
+		panicIf(os.MkdirAll(dir, 0755))
+
+		return dir
+	}
+
+	panicIf(os.MkdirAll(filepath.Join(dir, "."+dirName, "cache"), 0755))
+
+	return dir
+}
+
+func exists(path string) bool {
+	var err error
+
+	_, err = os.Stat(path)
+	if err == nil {
+		return true
+	}
+
+	if errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+
+	exit(err)
+
+	return false
 }
 
 func readConfig(name string) map[string][]string {
@@ -195,13 +246,13 @@ func readConfig(name string) map[string][]string {
 	return cfg
 }
 
-func detectMime(path string) (string, string) {
+func detectMime(data []byte) (string, string) {
 	var (
 		mime, parentMime *mimetype.MIME
 		err              error
 	)
 
-	mime, err = mimetype.DetectFile(path)
+	mime = mimetype.Detect(data)
 	exitIf(err)
 
 	parentMime = mime.Parent()
@@ -212,19 +263,19 @@ func detectMime(path string) (string, string) {
 	return strings.Split(mime.String(), ";")[0], strings.Split(parentMime.String(), ";")[0]
 }
 
-func execProgram(bin, path string, width, height, x, y int) bool {
+func execProgram(bin string, flags *flagsStruct, path string, cache *os.File) bool {
 	var cmd *exec.Cmd
 
 	cmd = exec.Command("/bin/sh", "-c", "--", bin)
-	cmd.Stdout = os.Stdout
+	cmd.Stdout = cache
 	cmd.Stderr = os.Stderr
 
 	cmd.Env = append(cmd.Environ(), []string{
 		fmt.Sprintf("TVIEW_FILE=%s", path),
-		fmt.Sprintf("TVIEW_WIDTH=%d", width),
-		fmt.Sprintf("TVIEW_HEIGHT=%d", height),
-		fmt.Sprintf("TVIEW_X=%d", x),
-		fmt.Sprintf("TVIEW_Y=%d", y),
+		fmt.Sprintf("TVIEW_WIDTH=%d", flags.width),
+		fmt.Sprintf("TVIEW_HEIGHT=%d", flags.height),
+		fmt.Sprintf("TVIEW_X=%d", flags.x),
+		fmt.Sprintf("TVIEW_Y=%d", flags.y),
 	}...)
 
 	panicIf(cmd.Err)
@@ -232,12 +283,36 @@ func execProgram(bin, path string, width, height, x, y int) bool {
 	return cmd.Run() == nil
 }
 
-func viewFile(path string, cfg map[string][]string, width, height, x, y int) {
-	var mime, parentMime, bin string
+func viewFile(flags *flagsStruct, path string) {
+	var (
+		data                             []byte
+		mime, parentMime, bin, cachePath string
+		cfg                              map[string][]string
+		cacheHit                         bool
+		cache                            *os.File
+		err                              error
+	)
 
-	mime, parentMime = detectMime(path)
+	data, err = os.ReadFile(path)
+	exitIf(err)
+
+	mime, parentMime = detectMime(data)
+	cfg = readConfig(flags.cfg)
+	cachePath = filepath.Join(flags.cache, fmt.Sprintf("%x", sha256.Sum256(data)))
+	cacheHit = exists(cachePath)
+
+	cache, err = os.OpenFile(cachePath, os.O_RDWR|os.O_CREATE, 0600)
+	panicIf(err)
+
+	defer func() {
+		exitIf(cache.Close())
+	}()
+
 	for _, bin = range append(append(cfg[mime], cfg[parentMime]...), cfg["application/octet-stream"]...) {
-		if execProgram(bin, path, width, height, x, y) {
+		if cacheHit || execProgram(bin, flags, path, cache) {
+			_, err = io.Copy(os.Stdout, cache)
+			panicIf(err)
+
 			return
 		}
 	}
@@ -247,10 +322,9 @@ func viewFile(path string, cfg map[string][]string, width, height, x, y int) {
 
 func main() {
 	var (
-		cfgFlag                             string
-		widthFlag, heightFlag, xFlag, yFlag int
-		width, height                       int
-		argv                                []string
+		flags         *flagsStruct
+		width, height int
+		argv          []string
 	)
 
 	flag.Usage = func() {
@@ -265,11 +339,14 @@ example: tview file.html`)
 	}
 
 	width, height, _ = term.GetSize(int(os.Stdin.Fd()))
-	flag.StringVar(&cfgFlag, "c", filepath.Join(configDir(), "config.json"), "config file path")
-	flag.IntVar(&widthFlag, "w", width, "terminal width")
-	flag.IntVar(&heightFlag, "h", height, "terminal height")
-	flag.IntVar(&xFlag, "x", 0, "x coordinates of pane")
-	flag.IntVar(&yFlag, "y", 0, "y coordinates of pane")
+	flags = &flagsStruct{}
+
+	flag.StringVar(&flags.cfg, "c", filepath.Join(configDir(), "config.json"), "config file path")
+	flag.StringVar(&flags.cache, "C", cacheDir(), "cache directory")
+	flag.IntVar(&flags.width, "w", width, "terminal width")
+	flag.IntVar(&flags.height, "h", height, "terminal height")
+	flag.IntVar(&flags.x, "x", 0, "x coordinates of pane")
+	flag.IntVar(&flags.y, "y", 0, "y coordinates of pane")
 	flag.Parse()
 
 	argv = flag.Args()
@@ -278,5 +355,5 @@ example: tview file.html`)
 		os.Exit(1)
 	}
 
-	viewFile(argv[0], readConfig(cfgFlag), widthFlag, heightFlag, xFlag, yFlag)
+	viewFile(flags, argv[0])
 }
