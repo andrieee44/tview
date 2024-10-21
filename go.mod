@@ -3,7 +3,8 @@ module github.com/andrieee44/tview
 go 1.22.3
 
 require (
-	github.com/gabriel-vasile/mimetype v1.4.5
+	github.com/cespare/xxhash/v2 v2.3.0
+	github.com/gabriel-vasile/mimetype v1.4.6
 	golang.org/x/term v0.25.0
 )
 

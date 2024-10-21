@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -12,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cespare/xxhash/v2"
 	"github.com/gabriel-vasile/mimetype"
 	"golang.org/x/term"
 )
@@ -306,7 +306,7 @@ func viewFile(flags *flagsStruct, path string) {
 
 	mime, parentMime = detectMime(data)
 	cfg = readConfig(flags.cfg)
-	cachePath = filepath.Join(flags.cache, fmt.Sprintf("%x", sha256.Sum256(data)))
+	cachePath = filepath.Join(flags.cache, fmt.Sprintf("%x", xxhash.Sum64(data)))
 	cacheHit = exists(cachePath)
 
 	cache, err = os.OpenFile(cachePath, os.O_RDWR|os.O_CREATE, 0600)
