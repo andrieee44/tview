@@ -17,8 +17,8 @@ import (
 )
 
 type flagsStruct struct {
-	cfg, cache          string
-	width, height, x, y int
+	cfg, cache    string
+	width, height int
 }
 
 func exit(err error) {
@@ -278,8 +278,6 @@ func execProgram(bin string, flags *flagsStruct, path string, cache *os.File) bo
 		fmt.Sprintf("TVIEW_FILE=%s", path),
 		fmt.Sprintf("TVIEW_WIDTH=%d", flags.width),
 		fmt.Sprintf("TVIEW_HEIGHT=%d", flags.height),
-		fmt.Sprintf("TVIEW_X=%d", flags.x),
-		fmt.Sprintf("TVIEW_Y=%d", flags.y),
 	}...)
 
 	panicIf(cmd.Err)
@@ -306,7 +304,7 @@ func viewFile(flags *flagsStruct, path string) {
 
 	mime, parentMime = detectMime(data)
 	cfg = readConfig(flags.cfg)
-	cachePath = filepath.Join(flags.cache, fmt.Sprintf("%x", xxhash.Sum64(data)))
+	cachePath = filepath.Join(flags.cache, fmt.Sprintf("%x", xxhash.Sum64(append(data, fmt.Sprintf("%d%d", flags.width, flags.height)...))))
 	cacheHit = exists(cachePath)
 
 	cache, err = os.OpenFile(cachePath, os.O_RDWR|os.O_CREATE, 0600)
@@ -351,8 +349,6 @@ example: tview file.html`)
 	flag.StringVar(&flags.cache, "C", cacheDir(), "cache directory")
 	flag.IntVar(&flags.width, "w", width, "terminal width")
 	flag.IntVar(&flags.height, "h", height, "terminal height")
-	flag.IntVar(&flags.x, "x", 0, "x coordinates of pane")
-	flag.IntVar(&flags.y, "y", 0, "y coordinates of pane")
 	flag.Parse()
 
 	argv = flag.Args()
