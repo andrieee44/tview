@@ -17,8 +17,8 @@ import (
 )
 
 type flagsStruct struct {
-	cfg, cache    string
-	width, height int
+	config, cache string
+	columns, rows int
 }
 
 func exit(err error) {
@@ -122,18 +122,18 @@ func readConfig(name string) map[string][]string {
 	archive = []string{`atool -l -- "$TVIEW_FILE"`}
 
 	office = []string{
-		`unoconv --stdout -e PageRange=1 -f jpg -- "$TVIEW_FILE" | chafa -s "${TVIEW_WIDTH}x${TVIEW_HEIGHT}" $([ "${XDG_SESSION_TYPE:-}" = "tty" ] || printf -- "-f sixels")`,
+		`unoconv --stdout -e PageRange=1 -f jpg -- "$TVIEW_FILE" | chafa -s "${TVIEW_COLUMNS}x${TVIEW_ROWS}" $([ "${XDG_SESSION_TYPE:-}" = "tty" ] || printf -- "-f sixels")`,
 		`libreoffice --cat "$TVIEW_FILE"`,
 	}
 
 	video = []string{
-		`ffmpegthumbnailer -i "$TVIEW_FILE" -s 0 -o /dev/stdout | chafa -s "${TVIEW_WIDTH}x${TVIEW_HEIGHT}" $([ "${XDG_SESSION_TYPE:-}" = "tty" ] || printf -- "-f sixels")`,
+		`ffmpegthumbnailer -i "$TVIEW_FILE" -s 0 -o /dev/stdout | chafa -s "${TVIEW_COLUMNS}x${TVIEW_ROWS}" $([ "${XDG_SESSION_TYPE:-}" = "tty" ] || printf -- "-f sixels")`,
 		`mediainfo -- "$TVIEW_FILE"`,
 	}
 
 	image = []string{
-		`chafa -s "${TVIEW_WIDTH}x${TVIEW_HEIGHT}" $([ "${XDG_SESSION_TYPE:-}" = "tty" ] || printf -- "-f sixels") "$TVIEW_FILE"`,
-		`magick "$TVIEW_FILE" jpg:- | chafa -s "${TVIEW_WIDTH}x${TVIEW_HEIGHT}" $([ "${XDG_SESSION_TYPE:-}" = "tty" ] || printf -- "-f sixels")`,
+		`chafa -s "${TVIEW_COLUMNS}x${TVIEW_ROWS}" $([ "${XDG_SESSION_TYPE:-}" = "tty" ] || printf -- "-f sixels") "$TVIEW_FILE"`,
+		`magick "$TVIEW_FILE" jpg:- | chafa -s "${TVIEW_COLUMNS}x${TVIEW_ROWS}" $([ "${XDG_SESSION_TYPE:-}" = "tty" ] || printf -- "-f sixels")`,
 		`mediainfo -- "$TVIEW_FILE"`,
 	}
 
@@ -143,14 +143,14 @@ func readConfig(name string) map[string][]string {
 	}
 
 	text = []string{
-		`bat --color always --paging never --terminal-width "$TVIEW_WIDTH" -- "$TVIEW_FILE"`,
+		`bat --color always --paging never --terminal-width "$TVIEW_COLUMNS" -- "$TVIEW_FILE"`,
 		`source-highlight --failsafe -i "$TVIEW_FILE"`,
 		`cat -- "$TVIEW_FILE"`,
 	}
 
 	html = []string{
-		`elinks -dump 1 -no-references -no-numbering -dump-width "$TVIEW_WIDTH" "$TVIEW_FILE"`,
-		`lynx -dump -nonumbers -nolist -width "$TVIEW_WIDTH" -- "$TVIEW_FILE"`,
+		`elinks -dump 1 -no-references -no-numbering -dump-width "$TVIEW_COLUMNS" "$TVIEW_FILE"`,
+		`lynx -dump -nonumbers -nolist -width "$TVIEW_COLUMNS" -- "$TVIEW_FILE"`,
 		`w3m -dump "$TVIEW_FILE"`,
 	}
 
@@ -167,7 +167,7 @@ func readConfig(name string) map[string][]string {
 		"application/ld+json":                             jq,
 		"application/msword":                              office,
 		"application/ogg":                                 audio,
-		"application/pdf":                                 {`pdftoppm -jpeg -f 1 -singlefile -- "$TVIEW_FILE" | chafa -s "${TVIEW_WIDTH}x${TVIEW_HEIGHT}" $([ "${XDG_SESSION_TYPE:-}" = "tty" ] || printf -- "-f sixels")`},
+		"application/pdf":                                 {`pdftoppm -jpeg -f 1 -singlefile -- "$TVIEW_FILE" | chafa -s "${TVIEW_COLUMNS}x${TVIEW_ROWS}" $([ "${XDG_SESSION_TYPE:-}" = "tty" ] || printf -- "-f sixels")`},
 		"application/rtf":                                 text,
 		"application/vnd.ms-excel":                        office,
 		"application/vnd.ms-powerpoint":                   office,
@@ -211,7 +211,7 @@ func readConfig(name string) map[string][]string {
 		"image/tiff":                  image,
 		"image/vnd.microsoft.icon":    image,
 		"image/webp":                  image,
-		"inode/directory":             {`ls --color --group-directories-first -w "$TVIEW_WIDTH" -- "$TVIEW_FILE"`},
+		"inode/directory":             {`ls --color --group-directories-first -w "$TVIEW_COLUMNS" -- "$TVIEW_FILE"`},
 		"text/css":                    text,
 		"text/csv":                    text,
 		"text/html":                   html,
@@ -236,8 +236,8 @@ func readConfig(name string) map[string][]string {
 		},
 
 		"text/markdown": {
-			`glow -w "$TVIEW_WIDTH" -- "$TVIEW_FILE"`,
-			`mdcat --columns "$TVIEW_WIDTH" -- "$TVIEW_FILE"`,
+			`glow -w "$TVIEW_COLUMNS" -- "$TVIEW_FILE"`,
+			`mdcat --columns "$TVIEW_COLUMNS" -- "$TVIEW_FILE"`,
 		},
 	}
 
@@ -277,8 +277,8 @@ func execProgram(bin string, flags *flagsStruct, path string, cache *os.File) bo
 
 	cmd.Env = append(cmd.Environ(), []string{
 		fmt.Sprintf("TVIEW_FILE=%s", path),
-		fmt.Sprintf("TVIEW_WIDTH=%d", flags.width),
-		fmt.Sprintf("TVIEW_HEIGHT=%d", flags.height),
+		fmt.Sprintf("TVIEW_COLUMNS=%d", flags.columns),
+		fmt.Sprintf("TVIEW_ROWS=%d", flags.rows),
 	}...)
 
 	panicIf(cmd.Err)
@@ -304,8 +304,8 @@ func viewFile(flags *flagsStruct, path string) {
 	exitIf(err)
 
 	mime, parentMime = detectMime(data)
-	cfg = readConfig(flags.cfg)
-	cachePath = filepath.Join(flags.cache, fmt.Sprintf("%x", xxhash.Sum64(append(data, fmt.Sprintf("%d%d", flags.width, flags.height)...))))
+	cfg = readConfig(flags.config)
+	cachePath = filepath.Join(flags.cache, fmt.Sprintf("%x", xxhash.Sum64(append(data, fmt.Sprintf("%d%d", flags.columns, flags.rows)...))))
 	cacheHit = exists(cachePath)
 
 	cache, err = os.OpenFile(cachePath, os.O_RDWR|os.O_CREATE, 0600)
@@ -328,28 +328,22 @@ func viewFile(flags *flagsStruct, path string) {
 func main() {
 	var (
 		flags         *flagsStruct
-		width, height int
+		columns, rows int
 		argv          []string
 	)
 
 	flag.Usage = func() {
-		fmt.Fprintln(flag.CommandLine.Output(), `usage: tview [OPTION]... FILE
-
-tview displays the FILE based on mimetype.
-mimetype programs list is in config file.
-
-example: tview file.html`)
-
+		fmt.Fprintln(flag.CommandLine.Output(), "usage: tview [--cache <directory>] [--columns <columns>] [--config <path>] [--rows <rows>] <FILE>")
 		flag.PrintDefaults()
 	}
 
-	width, height, _ = term.GetSize(int(os.Stdin.Fd()))
+	columns, rows, _ = term.GetSize(int(os.Stdin.Fd()))
 	flags = &flagsStruct{}
 
-	flag.StringVar(&flags.cfg, "c", filepath.Join(configDir(), "config.json"), "config file path")
-	flag.StringVar(&flags.cache, "C", cacheDir(), "cache directory")
-	flag.IntVar(&flags.width, "w", width, "terminal width")
-	flag.IntVar(&flags.height, "h", height, "terminal height")
+	flag.StringVar(&flags.config, "config", filepath.Join(configDir(), "config.json"), "config file path")
+	flag.StringVar(&flags.cache, "cache", cacheDir(), "cache directory")
+	flag.IntVar(&flags.columns, "columns", columns, "terminal columns")
+	flag.IntVar(&flags.rows, "rows", rows, "terminal rows")
 	flag.Parse()
 
 	argv = flag.Args()

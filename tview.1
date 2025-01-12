@@ -1,0 +1,31 @@
+.TH TVIEW 1
+.SH NAME
+tview \- preview files in the terminal
+.SH SYNOPSIS
+.B tview
+.RB [ \-\-config
+.IR path ]
+.RB [ \-\-cache
+.IR directory ]
+.RB [ \-\-columns
+.IR columns ]
+.RB [ \-\-rows
+.IR rows ]
+.I FILE
+.SH DESCRIPTION
+.B tview
+is a file previewer for the terminal, originally designed for
+.BR lf (1).
+It runs external programs to preview file content based on the file mimetype.
+.SH OPTIONS
+.TP
+.BI \-\-config " path"
+path to configuration file.
+.TP
+.BI \-\-cache " directory"
+directory used to store the cached file previews.
+.TP
+.BI \-\-columns " columns"
+the amount of columns
+.TP
+.BI \-\-rows " rows"
