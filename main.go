@@ -138,7 +138,7 @@ func readConfig(name string) map[string][]string {
 	}
 
 	jq = []string{
-		`jaq --color always . "$TVIEW_FILE"`,
+		`jaq -C always . "$TVIEW_FILE"`,
 		`jq -C . "$TVIEW_FILE"`,
 	}
 
