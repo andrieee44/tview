@@ -143,7 +143,7 @@ func readConfig(name string) map[string][]string {
 	}
 
 	text = []string{
-		`bat --color always --paging never --terminal-width "$TVIEW_COLUMNS" -- "$TVIEW_FILE"`,
+		`bat --color always --paging never --terminal-width "$NS" -- "$TVIEW_FILE"`,
 		`source-highlight --failsafe -i "$TVIEW_FILE"`,
 		`cat -- "$TVIEW_FILE"`,
 	}
@@ -340,9 +340,9 @@ func main() {
 	columns, rows, _ = term.GetSize(int(os.Stdin.Fd()))
 	flags = &flagsStruct{}
 
-	flag.StringVar(&flags.config, "config", filepath.Join(configDir(), "config.json"), "config file path")
 	flag.StringVar(&flags.cache, "cache", cacheDir(), "cache directory")
 	flag.IntVar(&flags.columns, "columns", columns, "terminal columns")
+	flag.StringVar(&flags.config, "config", filepath.Join(configDir(), "config.json"), "config file path")
 	flag.IntVar(&flags.rows, "rows", rows, "terminal rows")
 	flag.Parse()
 

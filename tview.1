@@ -3,29 +3,86 @@
 tview \- preview files in the terminal
 .SH SYNOPSIS
 .B tview
-.RB [ \-\-config
-.IR path ]
 .RB [ \-\-cache
 .IR directory ]
 .RB [ \-\-columns
 .IR columns ]
+.RB [ \-\-config
+.IR path ]
 .RB [ \-\-rows
 .IR rows ]
 .I FILE
 .SH DESCRIPTION
 .B tview
 is a file previewer for the terminal, originally designed for
-.BR lf (1).
+.IR lf (1).
 It runs external programs to preview file content based on the file mimetype.
+.PP
+.B tview
+caches the previous preview and uses the cache if the contents of the file did not change.
 .SH OPTIONS
 .TP
-.BI \-\-config " path"
-path to configuration file.
-.TP
 .BI \-\-cache " directory"
-directory used to store the cached file previews.
+The directory used to store the cached file previews. Defaults to
+.BR \\[dq]${XDG_CACHE_HOME}/tview\\[dq] .
 .TP
 .BI \-\-columns " columns"
-the amount of columns
+The amount of terminal columns passed to the external programs with the environment variable
+.BR \\[dq]$TVIEW_COLUMNS\\[dq] .
+Defaults to the column count of the terminal
+.B tview
+is running in.
+.TP
+.BI \-\-config " path"
+Path to configuration file. Defaults to
+.BR \\[dq]${XDG_CONFIG_HOME}/tview/config.json\\[dq] .
 .TP
 .BI \-\-rows " rows"
+the amount of terminal rows passed to the external programs with the environment variable
+.BR \\[dq]$TVIEW_ROWS\\[dq] .
+Defaults to the row count of the terminal
+.B tview
+is running in.
+.SH CONFIGURATION
+Configuration file is stored in
+.B \\[dq]${XDG_CONFIG_HOME}/tview/config.json\\[dq]
+by default.
+It is a JSON file containing key\-value entries of file mimetypes paired with a list of external programs to be executed to generate previews.
+See the 
+.B \\[dq]EXAMPLES\\[dq]
+section for an example configuration snippet.
+.PP
+The external programs receive arguments from environmental variables set during their execution.
+See the 
+.B \\[dq]ENVIRONMENT VARIABLES\\[dq]
+section for more information.
+.SH EXAMPLES
+.TP
+Preview a file:
+.B "$ tview ./myPhoto.png"
+.TP
+Example configuration snippet:
+.B { \\[dq]text/plain\\[dq] : [ \\[dq]bat --terminal-width \\\\\[dq]$TVIEW_COLUMNS\\\\\[dq] -- \\\\\[dq]$TVIEW_FILE\\\\\[dq]\\[dq] ] }
+.SH EXAMPLE LF PREVIWER
+.TP
+.RI In " lfrc" :
+.B "set previewer ./tviewlf.sh"
+.TP
+.RI In " tviewlf.sh" :
+.B "#! /bin/dash"
+.br
+.B "set -eu; tview --columns \\[dq]$2\\[dq] --rows \\[dq]$3\\[dq] -- \\[dq]$1\\[dq]"
+.SH "ENVIRONMENT VARIABLES"
+.TP
+.B $TVIEW_FILE
+Path to the file that needs previewing.
+.TP
+.B $TVIEW_COLUMNS
+Amount of available terminal columns.
+.TP
+.B $TVIEW_ROWS
+Amount of available terminal rows.
+.SH SEE ALSO
+.IR lf (1)
+.SH AUTHOR
+andrieee44 (andrieee44@gmail.com)
