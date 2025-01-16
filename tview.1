@@ -59,19 +59,26 @@ section for more information.
 .SH EXAMPLES
 .TP
 Preview a file:
+.EX
 .B $ tview ./myPhoto.png
+.EE
 .TP
 Example configuration snippet:
-.B { \(dqtext/plain\(dq : [ \(dqbat --terminal-width \(dq$TVIEW_COLUMNS\(dq -- \(dq$TVIEW_FILE\(dq\(dq ] }
+.EX
+.B { \(dqtext/plain\(dq : [ \(dqbat \-\-terminal\-width \(dq$TVIEW_COLUMNS\(dq \-\- \(dq$TVIEW_FILE\(dq\(dq ] }
+.EE
 .SH EXAMPLE LF PREVIWER
 .TP
 .RI In " lfrc" :
+.EX
 .B set previewer ./tviewlf.sh
+.EE
 .TP
 .RI In " tviewlf.sh" :
+.EX
 .B #! /bin/dash
-.br
-.B set -eu; tview --columns \(dq$2\(dq --rows \(dq$3\(dq -- \(dq$1\(dq
+.B set \-eu; tview \-\-columns \(dq$2\(dq \-\-rows \(dq$3\(dq \-\- \(dq$1\(dq
+.EE
 .SH "ENVIRONMENT VARIABLES"
 .TP
 .B $TVIEW_FILE
