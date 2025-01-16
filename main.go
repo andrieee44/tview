@@ -340,10 +340,10 @@ func main() {
 	columns, rows, _ = term.GetSize(int(os.Stdin.Fd()))
 	flags = &flagsStruct{}
 
-	flag.StringVar(&flags.cache, "cache", cacheDir(), "cache directory")
-	flag.IntVar(&flags.columns, "columns", columns, "terminal columns")
-	flag.StringVar(&flags.config, "config", filepath.Join(configDir(), "config.json"), "config file path")
-	flag.IntVar(&flags.rows, "rows", rows, "terminal rows")
+	flag.StringVar(&flags.cache, "cache", cacheDir(), `The directory used to store the cached file previews. Defaults to "${XDG_CACHE_HOME}/tview".`)
+	flag.IntVar(&flags.columns, "columns", columns, `The amount of terminal columns passed to the external programs with the environment variable "$TVIEW_COLUMNS". Defaults to the column count of the terminal tview is running in.`)
+	flag.StringVar(&flags.config, "config", filepath.Join(configDir(), "config.json"), `Path to configuration file. Defaults to "${XDG_CONFIG_HOME}/tview/config.json".`)
+	flag.IntVar(&flags.rows, "rows", rows, `the amount of terminal rows passed to the external programs with the environment variable "$TVIEW_ROWS". Defaults to the row count of the terminal tview is running in.`)
 	flag.Parse()
 
 	argv = flag.Args()
