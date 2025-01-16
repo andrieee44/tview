@@ -34,11 +34,11 @@ Defaults to the column count of the terminal
 is running in.
 .TP
 .BI \-\-config " path"
-Path to configuration file. Defaults to
+The path to configuration file. Defaults to
 .BR \(dq${XDG_CONFIG_HOME}/tview/config.json\(dq .
 .TP
 .BI \-\-rows " rows"
-the amount of terminal rows passed to the external programs with the environment variable
+The amount of terminal rows passed to the external programs with the environment variable
 .BR \(dq$TVIEW_ROWS\(dq .
 Defaults to the row count of the terminal
 .B tview
@@ -48,30 +48,30 @@ Configuration file is stored in
 .B \(dq${XDG_CONFIG_HOME}/tview/config.json\(dq
 by default.
 It is a JSON file containing key\-value entries of file mimetypes paired with a list of external programs to be executed to generate previews.
-See the 
+See the
 .B \(dqEXAMPLES\(dq
 section for an example configuration snippet.
 .PP
 The external programs receive arguments from environmental variables set during their execution.
-See the 
+See the
 .B \(dqENVIRONMENT VARIABLES\(dq
 section for more information.
 .SH EXAMPLES
 .TP
 Preview a file:
-.B "$ tview ./myPhoto.png"
+.B $ tview ./myPhoto.png
 .TP
 Example configuration snippet:
 .B { \(dqtext/plain\(dq : [ \(dqbat --terminal-width \(dq$TVIEW_COLUMNS\(dq -- \(dq$TVIEW_FILE\(dq\(dq ] }
 .SH EXAMPLE LF PREVIWER
 .TP
 .RI In " lfrc" :
-.B "set previewer ./tviewlf.sh"
+.B set previewer ./tviewlf.sh
 .TP
 .RI In " tviewlf.sh" :
-.B "#! /bin/dash"
+.B #! /bin/dash
 .br
-.B "set -eu; tview --columns \(dq$2\(dq --rows \(dq$3\(dq -- \(dq$1\(dq"
+.B set -eu; tview --columns \(dq$2\(dq --rows \(dq$3\(dq -- \(dq$1\(dq
 .SH "ENVIRONMENT VARIABLES"
 .TP
 .B $TVIEW_FILE
