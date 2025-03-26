@@ -284,7 +284,7 @@ func execProgram(bin string, flags *flagsStruct, path string, cache *os.File) bo
 	panicIf(cmd.Err)
 	success = cmd.Run() == nil
 
-	_, err = cache.Seek(io.SeekStart, 0)
+	_, err = cache.Seek(0, io.SeekStart)
 	panicIf(err)
 
 	return success
