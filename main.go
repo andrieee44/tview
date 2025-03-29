@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/adrg/xdg"
 	"github.com/cespare/xxhash/v2"
 	"github.com/gabriel-vasile/mimetype"
 	"golang.org/x/term"
@@ -36,32 +37,6 @@ func panicIf(err error) {
 	if err != nil {
 		panic(fmt.Errorf("tview: %s", err))
 	}
-}
-
-func configDir() string {
-	const dirName string = "tview"
-
-	var dir string
-
-	dir = os.Getenv("XDG_CONFIG_HOME")
-	if dir != "" {
-		dir = filepath.Join(dir, dirName)
-		panicIf(os.MkdirAll(dir, 0755))
-
-		return dir
-	}
-
-	dir = os.Getenv("HOME")
-	if dir != "" {
-		dir = filepath.Join(dir, ".config", dirName)
-		panicIf(os.MkdirAll(dir, 0755))
-
-		return dir
-	}
-
-	panicIf(os.MkdirAll(filepath.Join(dir, "."+dirName, "config"), 0755))
-
-	return dir
 }
 
 func cacheDir() string {
@@ -327,10 +302,15 @@ func viewFile(flags *flagsStruct, path string) {
 
 func main() {
 	var (
+		configPath    string
 		flags         *flagsStruct
 		columns, rows int
 		argv          []string
+		err           error
 	)
+
+	configPath, err = xdg.ConfigFile("tview/config.json")
+	panicIf(err)
 
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), "usage: tview [--cache <directory>] [--columns <columns>] [--config <path>] [--rows <rows>] <FILE>")
@@ -342,7 +322,7 @@ func main() {
 
 	flag.StringVar(&flags.cache, "cache", cacheDir(), `The directory used to store the cached file previews. Defaults to "${XDG_CACHE_HOME}/tview".`)
 	flag.IntVar(&flags.columns, "columns", columns, `The amount of terminal columns passed to the external programs with the environment variable "$TVIEW_COLUMNS". Defaults to the column count of the terminal tview is running in.`)
-	flag.StringVar(&flags.config, "config", filepath.Join(configDir(), "config.json"), `The path to configuration file. Defaults to "${XDG_CONFIG_HOME}/tview/config.json".`)
+	flag.StringVar(&flags.config, "config", configPath, `The path to configuration file. Defaults to "${XDG_CONFIG_HOME}/tview/config.json".`)
 	flag.IntVar(&flags.rows, "rows", rows, `The amount of terminal rows passed to the external programs with the environment variable "$TVIEW_ROWS". Defaults to the row count of the terminal tview is running in.`)
 	flag.Parse()
 
