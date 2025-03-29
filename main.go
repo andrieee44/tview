@@ -39,32 +39,6 @@ func panicIf(err error) {
 	}
 }
 
-func cacheDir() string {
-	const dirName string = "tview"
-
-	var dir string
-
-	dir = os.Getenv("XDG_CACHE_HOME")
-	if dir != "" {
-		dir = filepath.Join(dir, dirName)
-		panicIf(os.MkdirAll(dir, 0755))
-
-		return dir
-	}
-
-	dir = os.Getenv("HOME")
-	if dir != "" {
-		dir = filepath.Join(dir, ".cache", dirName)
-		panicIf(os.MkdirAll(dir, 0755))
-
-		return dir
-	}
-
-	panicIf(os.MkdirAll(filepath.Join(dir, "."+dirName, "cache"), 0755))
-
-	return dir
-}
-
 func exists(path string) bool {
 	var err error
 
@@ -320,7 +294,7 @@ func main() {
 	columns, rows, _ = term.GetSize(int(os.Stdin.Fd()))
 	flags = &flagsStruct{}
 
-	flag.StringVar(&flags.cache, "cache", cacheDir(), `The directory used to store the cached file previews. Defaults to "${XDG_CACHE_HOME}/tview".`)
+	flag.StringVar(&flags.cache, "cache", filepath.Join(xdg.CacheHome, "tview"), `The directory used to store the cached file previews. Defaults to "${XDG_CACHE_HOME}/tview".`)
 	flag.IntVar(&flags.columns, "columns", columns, `The amount of terminal columns passed to the external programs with the environment variable "$TVIEW_COLUMNS". Defaults to the column count of the terminal tview is running in.`)
 	flag.StringVar(&flags.config, "config", configPath, `The path to configuration file. Defaults to "${XDG_CONFIG_HOME}/tview/config.json".`)
 	flag.IntVar(&flags.rows, "rows", rows, `The amount of terminal rows passed to the external programs with the environment variable "$TVIEW_ROWS". Defaults to the row count of the terminal tview is running in.`)
